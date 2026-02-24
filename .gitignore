@@ -1,0 +1,17 @@
+# Terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+*.tfvars
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+
+# Docker
+docker-data/venv/
+*.pyc
+CLAUDE.md

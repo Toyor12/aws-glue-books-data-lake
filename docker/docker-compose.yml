@@ -1,0 +1,101 @@
+version: "3.9"
+
+# ============================================================
+# Book Scraper Lab — Local Development Environment
+# Buch-Scraper Lab — Lokale Entwicklungsumgebung
+#
+# EN: Run locally to test the scraper before deploying to AWS.
+#     No AWS charges during local development!
+# DE: Lokal ausführen um den Scraper vor dem AWS-Deployment zu testen.
+#     Keine AWS-Gebühren während der lokalen Entwicklung!
+#
+# Usage / Verwendung:
+#   docker-compose up -d
+#   docker-compose run scraper python scraper.py --dry-run --pages 2
+#   docker-compose run scraper python scraper.py --bucket my-bucket --pages 5
+# ============================================================
+
+services:
+
+  # ── Local S3 mock (MinIO) ─────────────────────────────────
+  # Lokale S3-Simulation (MinIO)
+  minio:
+    image: minio/minio:latest
+    container_name: books-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"   # S3 API endpoint
+      - "9001:9001"   # MinIO console UI
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── MinIO bucket setup ────────────────────────────────────
+  # MinIO-Bucket-Einrichtung
+  minio-setup:
+    image: minio/mc:latest
+    container_name: books-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 minioadmin minioadmin123;
+        mc mb local/books-lab-lake --ignore-existing;
+        mc mb local/books-lab-scripts --ignore-existing;
+        echo 'Buckets created / Buckets erstellt';
+      "
+
+  # ── Scraper service ───────────────────────────────────────
+  # Scraper-Dienst
+  scraper:
+    build:
+      context: ../scraper
+      dockerfile: Dockerfile
+    container_name: books-scraper
+    depends_on:
+      minio-setup:
+        condition: service_completed_successfully
+    environment:
+      # Point boto3 at MinIO / boto3 auf MinIO zeigen
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin123
+      AWS_DEFAULT_REGION: eu-west-1
+      # Override S3 endpoint to use MinIO
+      # S3-Endpunkt auf MinIO umleiten
+      AWS_ENDPOINT_URL: http://minio:9000
+    volumes:
+      - ../scraper:/app
+    working_dir: /app
+    # Default: dry run to avoid hitting the website during every docker up
+    # Standard: Probelauf um bei jedem docker up nicht die Website zu belasten
+    command: ["python", "scraper.py", "--dry-run", "--pages", "2"]
+
+  # ── Simple data viewer ────────────────────────────────────
+  # Einfacher Datenbetrachter
+  viewer:
+    image: python:3.11-slim
+    container_name: books-viewer
+    depends_on:
+      - minio
+    environment:
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin123
+      AWS_DEFAULT_REGION: eu-west-1
+      AWS_ENDPOINT_URL: http://minio:9000
+    volumes:
+      - ../scraper:/app
+      - ../docs:/docs
+    working_dir: /app
+    command: ["python", "-c", "print('Viewer ready. Use docker exec to run commands.')"]
+
+volumes:
+  minio_data:
+    driver: local
