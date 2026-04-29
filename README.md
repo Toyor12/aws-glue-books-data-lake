@@ -2,7 +2,6 @@
 
 ![Pipeline CI](https://github.com/Toyor12/aws-glue-books-data-lake/actions/workflows/ci.yml/badge.svg)
 
-![Pipeline CI](https://github.com/Toyor12/aws-glue-books-data-lake/actions/workflows/ci.yml/badge.svg)
 
 End-to-end serverless data pipeline that ingests book data from a public website, processes it using AWS Glue, and makes it available for analytics via Amazon Athena.
 
