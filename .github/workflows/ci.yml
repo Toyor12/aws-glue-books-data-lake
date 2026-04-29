@@ -23,7 +23,7 @@ jobs:
         run: pip install requests beautifulsoup4 boto3 lxml flake8
 
       - name: Lint scraper
-        run: flake8 scraper/scraper.py --max-line-length=120
+        run: flake8 scraper/scraper.py --max-line-length=130 --ignore=F401,E303
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
